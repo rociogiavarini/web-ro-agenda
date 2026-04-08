@@ -3,7 +3,7 @@ import {
   Camera, ChevronLeft, ChevronRight, Check, Lock, X,
   Calendar, BarChart3, List, LogOut, Loader2, ExternalLink, RefreshCw, Image
 } from 'lucide-react';
-import type { SessionCategory, PackDefinition, Booking, DbBackground, PackConfig } from './types';
+import type { SessionCategory, PackDefinition, Booking, DbBackground, PackConfig, GlobalSettings } from './types';
 import {
   CATEGORY_LABELS, CATEGORY_DESCRIPTIONS, CATEGORY_EMOJIS,
   PACKS, formatPrice, formatSplitPrice, formatPackDetails, BACKGROUND_THEMES
@@ -307,6 +307,9 @@ function StepCalendar({ selected, time, onSelect, onSelectTime }: { selected: st
               </button>
             ))}
           </div>
+          <p style={{ fontSize: 13, color: 'var(--gray-500)', marginTop: 16, textAlign: 'center' }}>
+            En caso de no coincidirte las fechas escribime por WhatsApp y coordinamos.
+          </p>
         </div>
       )}
     </div>
@@ -315,9 +318,18 @@ function StepCalendar({ selected, time, onSelect, onSelectTime }: { selected: st
 
 // ─── Step 5: Client Form ───────────────────────────────────────────────────
 function StepForm({ data, onChange }: {
-  data: { name: string; email: string; phone: string; attendees: string; notes: string };
+  data: { name: string; email: string; phone: string; attendees: string; notes: string; deliveryDate: string };
   onChange: (d: Partial<typeof data>) => void;
 }) {
+  // Suggest session date 20 days before the delivery date
+  const suggestedSession = data.deliveryDate
+    ? (() => {
+        const d = new Date(data.deliveryDate);
+        d.setDate(d.getDate() - 20);
+        return d.toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' });
+      })()
+    : null;
+
   return (
     <div>
       <div className="step-title">
@@ -337,6 +349,15 @@ function StepForm({ data, onChange }: {
         <div className="form-group">
           <label className="form-label">¿Quién/es vienen a la sesión? *</label>
           <input className="form-input" placeholder="Ej. Juan (2 años), mamá y papá" value={data.attendees} onChange={e => onChange({ attendees: e.target.value })} required/>
+        </div>
+        <div className="form-group" style={{ background: '#f8f4ff', padding: 14, borderRadius: 12, border: '1px solid var(--purple-light)' }}>
+          <label className="form-label" style={{ color: 'var(--purple)' }}>📅 ¿Para qué fecha necesitás listas las fotos? (opcional)</label>
+          <input className="form-input" type="date" value={data.deliveryDate} onChange={e => onChange({ deliveryDate: e.target.value })} style={{ marginTop: 6 }} />
+          {suggestedSession && (
+            <p style={{ fontSize: 12, color: 'var(--purple)', marginTop: 8, marginBottom: 0 }}>
+              💡 Te sugiero agendar <strong>20 días antes</strong> de esa fecha para que las impresiones lleguen a término (aprox el {suggestedSession}).
+            </p>
+          )}
         </div>
         <div className="form-group">
           <label className="form-label">Email (opcional)</label>
@@ -540,16 +561,55 @@ function AdminBackgrounds({ catalog, reloadCatalog }: { catalog: DbBackground[],
   );
 }
 
-// ─── Admin Pack Configs ─────────────────────────────────────────────────────
-function AdminPackConfigs({ configs, reload }: { configs: PackConfig[], reload: () => void }) {
+// ─── Admin Global Settings & Pack Configs ──────────────────────────────────────
+function AdminGlobalSettings({ settings, reload }: { settings: GlobalSettings, reload: () => void }) {
+  const [vals, setVals] = useState(settings);
+  const [saving, setSaving] = useState(false);
+  
+  const handleSave = async () => {
+    setSaving(true);
+    await supabase.from('global_settings').upsert({ ...vals, id: 'default' });
+    setSaving(false);
+    reload();
+  };
+
+  // Sync state if fetched settings change
+  useEffect(() => { setVals(settings); }, [settings]);
+
+  return (
+    <div style={{ background: '#f8f9fa', padding: 20, borderRadius: 12, marginBottom: 30 }}>
+      <h3 style={{ marginTop: 0 }}>Costos Unitarios Globales</h3>
+      <p style={{ fontSize: 13, color: 'var(--gray-500)', marginTop: -10, marginBottom: 15 }}>Estos costos se multiplicarán por las cantidades que incluya cada pack.</p>
+      
+      <div style={{ display: 'flex', gap: 15, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+        <div>
+          <span style={{ fontSize: 11, display: 'block', marginBottom: 4 }}>13x18 ($)</span>
+          <input type="number" className="form-input" style={{ width: 80 }} value={vals.cost_13x18} onChange={e => setVals({...vals, cost_13x18: Number(e.target.value)})} />
+        </div>
+        <div>
+          <span style={{ fontSize: 11, display: 'block', marginBottom: 4 }}>20x30 ($)</span>
+          <input type="number" className="form-input" style={{ width: 80 }} value={vals.cost_20x30} onChange={e => setVals({...vals, cost_20x30: Number(e.target.value)})} />
+        </div>
+        <div>
+          <span style={{ fontSize: 11, display: 'block', marginBottom: 4 }}>Fotolibro ($)</span>
+          <input type="number" className="form-input" style={{ width: 80 }} value={vals.cost_fotolibro} onChange={e => setVals({...vals, cost_fotolibro: Number(e.target.value)})} />
+        </div>
+        <div>
+          <span style={{ fontSize: 11, display: 'block', marginBottom: 4 }}>Imán ($)</span>
+          <input type="number" className="form-input" style={{ width: 80 }} value={vals.cost_imanes} onChange={e => setVals({...vals, cost_imanes: Number(e.target.value)})} />
+        </div>
+        <button className="btn-primary" onClick={handleSave} disabled={saving}>
+          {saving ? 'Guardando...' : 'Guardar Costos'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function AdminPackConfigs({ configs, globalSettings, reload }: { configs: PackConfig[], globalSettings: GlobalSettings, reload: () => void }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [vals, setVals] = useState({ 
     price: 0, 
-    cost: 0,
-    cost_13x18: 0,
-    cost_20x30: 0,
-    cost_fotolibro: 0,
-    cost_imanes: 0,
     cost_otros: 0,
     inclusions: ''
   });
@@ -558,31 +618,22 @@ function AdminPackConfigs({ configs, reload }: { configs: PackConfig[], reload: 
     setEditing(p.pack_id);
     setVals({ 
       price: p.price, 
-      cost: p.cost,
-      cost_13x18: p.cost_13x18 || 0,
-      cost_20x30: p.cost_20x30 || 0,
-      cost_fotolibro: p.cost_fotolibro || 0,
-      cost_imanes: p.cost_imanes || 0,
       cost_otros: p.cost_otros || 0,
-      // Pass the pack definition p separately or use p.pack_id to find it?
-      // Actually conf already has the pack_id. We need the pack definition for defaults.
       inclusions: p.inclusions || ''
     });
   };
 
-  const handleSave = async (id: string) => {
-    const totalCost = (Number(vals.cost_13x18) || 0) + (Number(vals.cost_20x30) || 0) + 
-                      (Number(vals.cost_fotolibro) || 0) + (Number(vals.cost_imanes) || 0) + 
+  const handleSave = async (id: string, packDef: PackDefinition) => {
+    const totalCost = (packDef.printQty13x18 * globalSettings.cost_13x18) + 
+                      (packDef.printQty20x30 * globalSettings.cost_20x30) + 
+                      (packDef.hasFotolibro ? globalSettings.cost_fotolibro : 0) + 
+                      (packDef.imanesQty * globalSettings.cost_imanes) + 
                       (Number(vals.cost_otros) || 0);
                       
     await supabase.from('pack_configs').upsert({ 
       pack_id: id, 
       price: vals.price, 
       cost: totalCost,
-      cost_13x18: vals.cost_13x18,
-      cost_20x30: vals.cost_20x30,
-      cost_fotolibro: vals.cost_fotolibro,
-      cost_imanes: vals.cost_imanes,
       cost_otros: vals.cost_otros,
       inclusions: vals.inclusions
     });
@@ -592,6 +643,7 @@ function AdminPackConfigs({ configs, reload }: { configs: PackConfig[], reload: 
 
   return (
     <div style={{ marginTop: 20 }}>
+      <AdminGlobalSettings settings={globalSettings} reload={reload} />
       <div className="table-wrapper">
         <table>
           <thead>
@@ -608,13 +660,16 @@ function AdminPackConfigs({ configs, reload }: { configs: PackConfig[], reload: 
             {ALL_CATEGORIES.flatMap(cat => PACKS.filter(p => p.category === cat)).map(p => {
               const conf = configs.find(c => c.pack_id === p.id) || { 
                 pack_id: p.id, price: p.price, cost: 0,
-                cost_13x18: 0, cost_20x30: 0, cost_fotolibro: 0, cost_imanes: 0, cost_otros: 0
+                cost_otros: 0
               };
               const isEditing = editing === p.id;
               
-              const totalCost = (Number(vals.cost_13x18) || 0) + (Number(vals.cost_20x30) || 0) + 
-                                (Number(vals.cost_fotolibro) || 0) + (Number(vals.cost_imanes) || 0) + 
-                                (Number(vals.cost_otros) || 0);
+              const calcCost = (p.printQty13x18 * globalSettings.cost_13x18) + 
+                               (p.printQty20x30 * globalSettings.cost_20x30) + 
+                               (p.hasFotolibro ? globalSettings.cost_fotolibro : 0) + 
+                               (p.imanesQty * globalSettings.cost_imanes);
+                               
+              const totalCost = calcCost + (isEditing ? Number(vals.cost_otros) : Number(conf.cost_otros || 0));
 
               return (
                 <tr key={p.id}>
@@ -638,34 +693,26 @@ function AdminPackConfigs({ configs, reload }: { configs: PackConfig[], reload: 
                   <td>
                     {isEditing ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        <div style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 11 }}>13x18: <input type="number" className="form-input" style={{ width: 60, padding: '4px' }} value={vals.cost_13x18} onChange={e => setVals({...vals, cost_13x18: Number(e.target.value)})} /></div>
-                        <div style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 11 }}>20x30: <input type="number" className="form-input" style={{ width: 60, padding: '4px' }} value={vals.cost_20x30} onChange={e => setVals({...vals, cost_20x30: Number(e.target.value)})} /></div>
-                        <div style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 11 }}>Libro: <input type="number" className="form-input" style={{ width: 60, padding: '4px' }} value={vals.cost_fotolibro} onChange={e => setVals({...vals, cost_fotolibro: Number(e.target.value)})} /></div>
-                        <div style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 11 }}>Imán: <input type="number" className="form-input" style={{ width: 60, padding: '4px' }} value={vals.cost_imanes} onChange={e => setVals({...vals, cost_imanes: Number(e.target.value)})} /></div>
-                        <div style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 11 }}>Otro: <input type="number" className="form-input" style={{ width: 60, padding: '4px' }} value={vals.cost_otros} onChange={e => setVals({...vals, cost_otros: Number(e.target.value)})} /></div>
+                        <div style={{ fontSize: 10, color: 'var(--gray-500)' }}>
+                          Base global: {formatPrice(calcCost)}<br/>
+                          (13x18: {p.printQty13x18}, 20x30: {p.printQty20x30}, Libro: {p.hasFotolibro ? 1: 0}, Imán: {p.imanesQty})
+                        </div>
+                        <div style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 11 }}>Otro Extra: <input type="number" className="form-input" style={{ width: 60, padding: '4px' }} value={vals.cost_otros} onChange={e => setVals({...vals, cost_otros: Number(e.target.value)})} /></div>
                         <strong style={{ fontSize: 12 }}>Total: {formatPrice(totalCost)}</strong>
                       </div>
                     ) : (
                       <div>
-                        {formatPrice(conf.cost)}
-                        {(conf.cost_13x18 || conf.cost_20x30 || conf.cost_fotolibro || conf.cost_imanes || conf.cost_otros) ? (
-                          <div style={{ fontSize: 9, color: 'var(--gray-400)', marginTop: 4 }}>
-                            {conf.cost_13x18! > 0 && ` 13x18:${formatPrice(conf.cost_13x18!)}`}
-                            {conf.cost_20x30! > 0 && ` 20x30:${formatPrice(conf.cost_20x30!)}`}
-                            {conf.cost_fotolibro! > 0 && ` Libro:${formatPrice(conf.cost_fotolibro!)}`}
-                            {conf.cost_imanes! > 0 && ` Imán:${formatPrice(conf.cost_imanes!)}`}
-                            {conf.cost_otros! > 0 && ` Otros:${formatPrice(conf.cost_otros!)}`}
-                          </div>
-                        ) : null}
+                        {formatPrice(totalCost)}
+                        {conf.cost_otros! > 0 && <div style={{ fontSize: 9, color: 'var(--gray-400)', marginTop: 4 }}>Otros: {formatPrice(conf.cost_otros!)}</div>}
                       </div>
                     )}
                   </td>
                   <td style={{ fontWeight: 700, color: 'var(--green)' }}>
-                    {formatPrice((isEditing ? vals.price : conf.price) - (isEditing ? totalCost : conf.cost))}
+                    {formatPrice((isEditing ? vals.price : conf.price) - totalCost)}
                   </td>
                   <td>
                     {isEditing ? (
-                      <button className="btn-primary" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => handleSave(p.id)}>Guardar</button>
+                      <button className="btn-primary" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => handleSave(p.id, p)}>Guardar</button>
                     ) : (
                       <button className="btn-secondary" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => handleEdit(conf)}>Editar/Desglosar</button>
                     )
@@ -682,7 +729,7 @@ function AdminPackConfigs({ configs, reload }: { configs: PackConfig[], reload: 
 }
 
 // ─── Admin Panel ───────────────────────────────────────────────────────────
-function AdminPanel({ catalog, reloadCatalog, onClose }: { catalog: DbBackground[], reloadCatalog: () => void, onClose: () => void }) {
+function AdminPanel({ catalog, reloadCatalog, onClose, globalSettings, reloadGlobalSettings }: { catalog: DbBackground[], reloadCatalog: () => void, onClose: () => void, globalSettings: GlobalSettings, reloadGlobalSettings: () => void }) {
   const [authed, setAuthed] = useState(false);
   const [pwd, setPwd] = useState('');
   const [pwdError, setPwdError] = useState(false);
@@ -835,7 +882,7 @@ function AdminPanel({ catalog, reloadCatalog, onClose }: { catalog: DbBackground
           ) : tab === 'backgrounds' ? (
             <AdminBackgrounds catalog={catalog} reloadCatalog={reloadCatalog} />
           ) : tab === 'packs' ? (
-            <AdminPackConfigs configs={packConfigs} reload={loadPackConfigs} />
+            <AdminPackConfigs configs={packConfigs} globalSettings={globalSettings} reload={() => { loadPackConfigs(); reloadGlobalSettings(); }} />
           ) : tab === 'bookings' ? (
             <>
               <div className="admin-filters">
@@ -1010,9 +1057,10 @@ export default function App() {
   const [selectedBackgrounds, setSelectedBackgrounds] = useState<string[]>([]);
   const [date, setDate] = useState<string | null>(null);
   const [time, setTime] = useState<string>('');
-  const [form, setForm] = useState({ name: '', email: '', phone: '', attendees: '', notes: '' });
+  const [form, setForm] = useState({ name: '', email: '', phone: '', attendees: '', notes: '', deliveryDate: '' });
   const [catalog, setCatalog] = useState<DbBackground[]>([]);
   const [packConfigs, setPackConfigs] = useState<PackConfig[]>([]);
+  const [globalSettings, setGlobalSettings] = useState<GlobalSettings>({ id: 'default', cost_13x18: 0, cost_20x30: 0, cost_fotolibro: 0, cost_imanes: 0 });
 
   const loadData = async () => {
     const { data: bgData } = await supabase.from('backgrounds').select('*').order('created_at', { ascending: true });
@@ -1020,6 +1068,9 @@ export default function App() {
 
     const { data: pcData } = await supabase.from('pack_configs').select('*');
     if (pcData) setPackConfigs(pcData as PackConfig[]);
+    
+    const { data: gData } = await supabase.from('global_settings').select('*').eq('id', 'default').maybeSingle();
+    if (gData) setGlobalSettings(gData as GlobalSettings);
   };
 
   useEffect(() => { loadData(); }, []);
@@ -1037,7 +1088,12 @@ export default function App() {
 
   const getPackCost = (p: PackDefinition) => {
     const conf = packConfigs.find(c => c.pack_id === p.id);
-    return conf ? conf.cost : 0;
+    let base = conf?.cost_otros || 0;
+    base += (p.printQty13x18 * globalSettings.cost_13x18);
+    base += (p.printQty20x30 * globalSettings.cost_20x30);
+    if (p.hasFotolibro) base += globalSettings.cost_fotolibro;
+    base += (p.imanesQty * globalSettings.cost_imanes);
+    return base;
   };
 
   const isInfantil = category === 'infantil_estudio';
@@ -1121,6 +1177,7 @@ export default function App() {
       `*Pack:* ${booking.pack_name} ($ ${booking.pack_price})\n` +
       `${booking.backgrounds_qty ? `*Fondos elegidos:* ${booking.selected_backgrounds?.map(id => catalog.find(b => b.id === id)?.name).join(', ')}\n` : ''}` +
       `*Fecha:* ${booking.session_date} a las ${booking.session_time}\n` +
+      `${form.deliveryDate ? `*Fecha límite de entrega:* ${form.deliveryDate}\n` : ''}` +
       `${booking.notes ? `\n*Mensaje:* ${booking.notes}\n` : ''}\n` +
       `--- Pago ---\n` +
       `*Total:* ${formatPrice(booking.pack_price!)}\n` +
@@ -1135,7 +1192,7 @@ export default function App() {
   const reset = () => {
     setStep(0); setDone(false);
     setCategory(null); setPack(null); setBackgrounds(1); setSelectedBackgrounds([]); setDate(null); setTime('');
-    setForm({ name: '', email: '', phone: '', attendees: '', notes: '' });
+    setForm({ name: '', email: '', phone: '', attendees: '', notes: '', deliveryDate: '' });
   };
 
   // Determine which logical step maps to which display step
@@ -1231,7 +1288,7 @@ export default function App() {
       </main>
 
       {/* Admin Panel */}
-      {showAdmin && <AdminPanel catalog={catalog} reloadCatalog={loadData} onClose={() => setShowAdmin(false)}/>}
+      {showAdmin && <AdminPanel catalog={catalog} reloadCatalog={loadData} globalSettings={globalSettings} reloadGlobalSettings={loadData} onClose={() => setShowAdmin(false)}/>}
 
       {/* Toast */}
       {toast && <div className="toast">{toast}</div>}

@@ -111,10 +111,18 @@ export type DbBackground = {
   image_data: string;
 };
 
+export type GlobalSettings = {
+  id: string;
+  cost_13x18: number;
+  cost_20x30: number;
+  cost_fotolibro: number;
+  cost_imanes: number;
+};
+
 export type PackConfig = {
   pack_id: string;
   price: number;
-  cost: number; // total cost
+  cost: number; // total computed cost for legacy compatibility
   cost_13x18?: number;
   cost_20x30?: number;
   cost_fotolibro?: number;

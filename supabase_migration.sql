@@ -60,6 +60,19 @@ CREATE TABLE IF NOT EXISTS backgrounds (
   created_at timestamptz DEFAULT now()
 );
 
+-- =========================================================
+-- Configuración Global (Costos Unitarios)
+-- =========================================================
+CREATE TABLE IF NOT EXISTS global_settings (
+  id text PRIMARY KEY DEFAULT 'default',
+  cost_13x18 numeric NOT NULL DEFAULT 0,
+  cost_20x30 numeric NOT NULL DEFAULT 0,
+  cost_fotolibro numeric NOT NULL DEFAULT 0,
+  cost_imanes numeric NOT NULL DEFAULT 0,
+  updated_at timestamptz DEFAULT now()
+);
+
+-- =========================================================
 -- Configuración de Packs (Precios y Costos dinámicos)
 CREATE TABLE IF NOT EXISTS pack_configs (
   pack_id text PRIMARY KEY,
@@ -77,6 +90,7 @@ CREATE TABLE IF NOT EXISTS pack_configs (
 -- Permisos públicos para simplificar el admin basado en frontend
 ALTER TABLE backgrounds ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pack_configs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE global_settings ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "allow_insert_bg" ON backgrounds FOR INSERT TO anon WITH CHECK (true);
 CREATE POLICY "allow_read_bg" ON backgrounds FOR SELECT TO anon USING (true);
@@ -84,6 +98,8 @@ CREATE POLICY "allow_update_bg" ON backgrounds FOR UPDATE TO anon USING (true);
 CREATE POLICY "allow_delete_bg" ON backgrounds FOR DELETE TO anon USING (true);
 
 CREATE POLICY "allow_all_pack_configs" ON pack_configs FOR ALL TO anon USING (true);
+
+CREATE POLICY "allow_all_global" ON global_settings FOR ALL TO anon USING (true);
 
 -- Index for ordering
 CREATE INDEX IF NOT EXISTS idx_backgrounds_created_at ON backgrounds (created_at);
