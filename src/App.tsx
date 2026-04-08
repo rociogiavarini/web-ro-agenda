@@ -285,13 +285,17 @@ function StepBackgrounds({ pack, value, onChange, selectedBackgrounds, onToggleB
 const TIMES = ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00', '17:00'];
 
 // ─── Step 4: Calendar ──────────────────────────────────────────────────────
-function StepCalendar({ selected, time, onSelect, onSelectTime }: { selected: string | null; time: string; onSelect: (d: string) => void; onSelectTime: (t: string) => void; }) {
+function StepCalendar({ category, selected, time, onSelect, onSelectTime }: { category: SessionCategory; selected: string | null; time: string; onSelect: (d: string) => void; onSelectTime: (t: string) => void; }) {
   return (
     <div>
       <div className="step-title">
         <h2>Elegí la fecha y el horario</h2>
         <p>Seleccioná el día y hora que más te convenga y te confirmo disponibilidad.</p>
-        <p style={{ color: 'var(--purple)', fontSize: 13, fontWeight: 600, marginTop: 4 }}>💡 Tené en cuenta elegir una fecha 20 días antes del evento.</p>
+        <p style={{ color: 'var(--purple)', fontSize: 13, fontWeight: 600, marginTop: 4 }}>
+          {category === 'mi_1er_recuerdo' && "💡 A partir de los 15 días de vida, si ya tiene un mes es mejor esperar hasta los 3 meses."}
+          {category === 'maternidad' && "💡 Idealmente realizar antes de la semana 36."}
+          {(category === 'infantil_estudio' || category === 'exterior') && "💡 Tené en cuenta elegir una fecha 20 días antes del evento."}
+        </p>
       </div>
       <BookingCalendar selected={selected} onSelect={onSelect} />
       {selected && (
@@ -1209,7 +1213,7 @@ export default function App() {
     if (step === 0) return <StepCategory selected={category} onSelect={c => { setCategory(c); setPack(null); }}/>;
     if (step === 1) return <StepPack category={category!} selected={pack} onSelect={setPack} getPackPrice={getPackPrice} getPackInclusions={getPackInclusions}/>;
     if (isInfantil && step === 2) return <StepBackgrounds pack={pack!} value={backgrounds} onChange={setBackgrounds} selectedBackgrounds={selectedBackgrounds} onToggleBackground={toggleBackground} catalog={catalog}/>;
-    if (step === dateStep) return <StepCalendar selected={date} time={time} onSelect={setDate} onSelectTime={setTime}/>;
+    if (step === dateStep) return <StepCalendar category={category!} selected={date} time={time} onSelect={setDate} onSelectTime={setTime}/>;
     if (step === formStep) return <StepForm data={form} onChange={d => setForm(f => ({ ...f, ...d }))}/>;
     if (step === confirmStep) return (
       <StepConfirm
