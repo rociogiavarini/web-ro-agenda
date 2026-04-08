@@ -33,7 +33,7 @@ export type Booking = {
   session_time: string;
   notes: string;
   cost?: number;
-  status: 'pending' | 'confirmed' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'cancelled' | 'reservado' | 'pago_1' | 'pago_2' | 'pre_seleccion' | 'entregado';
   created_at?: string;
 };
 

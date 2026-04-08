@@ -110,3 +110,6 @@ BEGIN;
 ALTER TABLE pack_configs ADD COLUMN IF NOT EXISTS cost_otros numeric DEFAULT 0;
 ALTER TABLE pack_configs ADD COLUMN IF NOT EXISTS inclusions text DEFAULT '';
 COMMIT;
+
+-- Eliminar el constraint de estado para permitir los nuevos estados: reservado, pago_1, etc.
+ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_status_check;

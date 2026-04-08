@@ -894,6 +894,11 @@ function AdminPanel({ catalog, reloadCatalog, onClose, globalSettings, reloadGlo
                 <select className="filter-select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
                   <option value="">Todos los estados</option>
                   <option value="pending">Pendiente</option>
+                  <option value="reservado">Reservado</option>
+                  <option value="pago_1">Pago 1</option>
+                  <option value="pago_2">Pago 2</option>
+                  <option value="pre_seleccion">Pre Selección</option>
+                  <option value="entregado">Entregado</option>
                   <option value="confirmed">Confirmada</option>
                   <option value="cancelled">Cancelada</option>
                 </select>
@@ -923,6 +928,7 @@ function AdminPanel({ catalog, reloadCatalog, onClose, globalSettings, reloadGlo
                         <th>Fecha sesión</th>
                         <th>Total</th>
                         <th>Estado</th>
+                        <th>Acción</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -943,12 +949,22 @@ function AdminPanel({ catalog, reloadCatalog, onClose, globalSettings, reloadGlo
                               className="status-select"
                               value={b.status}
                               onChange={e => updateStatus(b.id!, e.target.value as Booking['status'])}
-                              style={{ color: b.status === 'confirmed' ? 'var(--green)' : b.status === 'cancelled' ? 'var(--red)' : 'var(--yellow)' }}
+                              style={{ color: b.status === 'cancelled' ? 'var(--red)' : b.status === 'entregado' ? 'var(--dark)' : 'var(--green)' }}
                             >
                               <option value="pending">⏳ Pendiente</option>
+                              <option value="reservado">🗓️ Reservado</option>
+                              <option value="pago_1">💰 Pago 1</option>
+                              <option value="pago_2">💸 Pago 2</option>
+                              <option value="pre_seleccion">📸 Pre Selección</option>
+                              <option value="entregado">🎁 Entregado</option>
                               <option value="confirmed">✅ Confirmada</option>
                               <option value="cancelled">❌ Cancelada</option>
                             </select>
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <a href={makeGCalLink(b)} target="_blank" rel="noopener noreferrer" className="btn-secondary" style={{ padding: '4px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} title="Agregar a mi Google Calendar">
+                              <Calendar size={14}/>
+                            </a>
                           </td>
                         </tr>
                       ))}
