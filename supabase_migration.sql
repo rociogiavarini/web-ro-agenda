@@ -104,3 +104,9 @@ CREATE POLICY "allow_all_global" ON global_settings FOR ALL TO anon USING (true)
 -- Index for ordering
 CREATE INDEX IF NOT EXISTS idx_backgrounds_created_at ON backgrounds (created_at);
 CREATE INDEX IF NOT EXISTS idx_backgrounds_theme ON backgrounds (theme);
+
+-- Asegurar que las columnas existan si la tabla fue creada antes
+BEGIN;
+ALTER TABLE pack_configs ADD COLUMN IF NOT EXISTS cost_otros numeric DEFAULT 0;
+ALTER TABLE pack_configs ADD COLUMN IF NOT EXISTS inclusions text DEFAULT '';
+COMMIT;
