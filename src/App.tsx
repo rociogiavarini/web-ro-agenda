@@ -290,7 +290,8 @@ function StepCalendar({ selected, time, onSelect, onSelectTime }: { selected: st
     <div>
       <div className="step-title">
         <h2>Elegí la fecha y el horario</h2>
-        <p>Seleccioná el día y hora que más te convenga y te confirmo disponibilidad</p>
+        <p>Seleccioná el día y hora que más te convenga y te confirmo disponibilidad.</p>
+        <p style={{ color: 'var(--purple)', fontSize: 13, fontWeight: 600, marginTop: 4 }}>💡 Tené en cuenta elegir una fecha 20 días antes del evento.</p>
       </div>
       <BookingCalendar selected={selected} onSelect={onSelect} />
       {selected && (
