@@ -52,7 +52,7 @@ const DAY_NAMES = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
 const today = new Date();
 
 // ─── Calendar Component ────────────────────────────────────────────────────
-function BookingCalendar({ selected, onSelect }: { selected: string | null; onSelect: (d: string) => void }) {
+function BookingCalendar({ selected, onSelect, availableDates = [], adminMode = false }: { selected: string | null; onSelect: (d: string) => void; availableDates?: string[]; adminMode?: boolean }) {
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
 
@@ -103,19 +103,21 @@ function BookingCalendar({ selected, onSelect }: { selected: string | null; onSe
           const day = i + 1;
           const iso = makeDate(day);
           const past = isPast(day);
+          const isAvail = adminMode ? true : availableDates.includes(iso);
+          const isSelected = adminMode ? availableDates.includes(iso) : selected === iso;
           return (
             <button
               key={day}
-              className={`cal-day${selected === iso ? ' selected' : ''}${isToday(day) && selected !== iso ? ' today' : ''}`}
-              disabled={past}
-              onClick={() => !past && onSelect(iso)}
+              className={`cal-day${isSelected ? ' selected' : ''}${isToday(day) && !isSelected ? ' today' : ''}`}
+              disabled={past || !isAvail}
+              onClick={() => (!past && isAvail) && onSelect(iso)}
             >
               {day}
             </button>
           );
         })}
       </div>
-      {selected && (
+      {selected && !adminMode && (
         <div className="cal-selected-display">
           <p>📅 {formatSelected(selected)}</p>
           <span>¡Fecha seleccionada!</span>
@@ -285,7 +287,7 @@ function StepBackgrounds({ pack, value, onChange, selectedBackgrounds, onToggleB
 const TIMES = ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00', '17:00'];
 
 // ─── Step 4: Calendar ──────────────────────────────────────────────────────
-function StepCalendar({ category, selected, time, onSelect, onSelectTime }: { category: SessionCategory; selected: string | null; time: string; onSelect: (d: string) => void; onSelectTime: (t: string) => void; }) {
+function StepCalendar({ category, selected, time, onSelect, onSelectTime, availableDates }: { category: SessionCategory; selected: string | null; time: string; onSelect: (d: string) => void; onSelectTime: (t: string) => void; availableDates: string[] }) {
   return (
     <div>
       <div className="step-title">
@@ -297,7 +299,7 @@ function StepCalendar({ category, selected, time, onSelect, onSelectTime }: { ca
           {(category === 'infantil_estudio' || category === 'exterior') && "💡 Tené en cuenta elegir una fecha 20 días antes del evento."}
         </p>
       </div>
-      <BookingCalendar selected={selected} onSelect={onSelect} />
+      <BookingCalendar selected={selected} onSelect={onSelect} availableDates={availableDates} />
       {selected && (
         <div className="time-picker-section">
           <h3>Horarios disponibles</h3>
@@ -566,6 +568,37 @@ function AdminBackgrounds({ catalog, reloadCatalog }: { catalog: DbBackground[],
   );
 }
 
+// ─── Admin Available Dates ───────────────────────────────────────────────────
+function AdminAvailableDates({ availableDates, reloadDates }: { availableDates: string[], reloadDates: () => void }) {
+  const [adding, setAdding] = useState(false);
+
+  const toggleDate = async (d: string) => {
+    setAdding(true);
+    if (availableDates.includes(d)) {
+      await supabase.from('available_dates').delete().eq('date', d);
+    } else {
+      await supabase.from('available_dates').insert({ date: d });
+    }
+    setAdding(false);
+    reloadDates();
+  };
+
+  return (
+    <div style={{ background: '#f8f9fa', padding: 20, borderRadius: 12, marginBottom: 30 }}>
+      <h3 style={{ marginTop: 0 }}>Fechas Libres</h3>
+      <p style={{ fontSize: 13, color: 'var(--gray-500)', marginTop: -10, marginBottom: 15 }}>Seleccioná las fechas en las que vas a tener disponibilidad para las sesiones. Las que no estén marcadas, no se podrán elegir.</p>
+      <div style={{ maxWidth: 350, margin: '0 auto', opacity: adding ? 0.6 : 1 }}>
+        <BookingCalendar 
+          selected={null} 
+          onSelect={toggleDate} 
+          availableDates={availableDates} 
+          adminMode={true} 
+        />
+      </div>
+    </div>
+  );
+}
+
 // ─── Admin Global Settings & Pack Configs ──────────────────────────────────────
 function AdminGlobalSettings({ settings, reload }: { settings: GlobalSettings, reload: () => void }) {
   const [vals, setVals] = useState(settings);
@@ -734,11 +767,11 @@ function AdminPackConfigs({ configs, globalSettings, reload }: { configs: PackCo
 }
 
 // ─── Admin Panel ───────────────────────────────────────────────────────────
-function AdminPanel({ catalog, reloadCatalog, onClose, globalSettings, reloadGlobalSettings }: { catalog: DbBackground[], reloadCatalog: () => void, onClose: () => void, globalSettings: GlobalSettings, reloadGlobalSettings: () => void }) {
+function AdminPanel({ catalog, reloadCatalog, onClose, globalSettings, reloadGlobalSettings, availableDates, reloadDates }: { catalog: DbBackground[], reloadCatalog: () => void, onClose: () => void, globalSettings: GlobalSettings, reloadGlobalSettings: () => void, availableDates: string[], reloadDates: () => void }) {
   const [authed, setAuthed] = useState(false);
   const [pwd, setPwd] = useState('');
   const [pwdError, setPwdError] = useState(false);
-  const [tab, setTab] = useState<'bookings' | 'analytics' | 'backgrounds' | 'packs'>('bookings');
+  const [tab, setTab] = useState<'bookings' | 'analytics' | 'backgrounds' | 'packs' | 'dates'>('bookings');
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [packConfigs, setPackConfigs] = useState<PackConfig[]>([]);
   const [loading, setLoading] = useState(true);
@@ -768,6 +801,11 @@ function AdminPanel({ catalog, reloadCatalog, onClose, globalSettings, reloadGlo
   };
 
   useEffect(() => { if (authed) loadBookings(); }, [authed]);
+
+  const handleDateEdit = async (id: string, newDate: string) => {
+    await supabase.from('bookings').update({ session_date: newDate }).eq('id', id);
+    setBookings(prev => prev.map(bk => bk.id === id ? { ...bk, session_date: newDate } : bk));
+  };
 
   const updateStatus = async (id: string, status: Booking['status']) => {
     await supabase.from('bookings').update({ status }).eq('id', id);
@@ -879,6 +917,9 @@ function AdminPanel({ catalog, reloadCatalog, onClose, globalSettings, reloadGlo
           <button className={`admin-tab${tab === 'packs' ? ' active' : ''}`} onClick={() => setTab('packs')}>
             <Lock size={14}/> Configuración Packs
           </button>
+          <button className={`admin-tab${tab === 'dates' ? ' active' : ''}`} onClick={() => setTab('dates')}>
+            <Calendar size={14}/> Fechas Libres
+          </button>
         </div>
 
         <div className="admin-body">
@@ -888,6 +929,8 @@ function AdminPanel({ catalog, reloadCatalog, onClose, globalSettings, reloadGlo
             <AdminBackgrounds catalog={catalog} reloadCatalog={reloadCatalog} />
           ) : tab === 'packs' ? (
             <AdminPackConfigs configs={packConfigs} globalSettings={globalSettings} reload={() => { loadPackConfigs(); reloadGlobalSettings(); }} />
+          ) : tab === 'dates' ? (
+            <AdminAvailableDates availableDates={availableDates} reloadDates={reloadDates} />
           ) : tab === 'bookings' ? (
             <>
               <div className="admin-filters">
@@ -941,7 +984,13 @@ function AdminPanel({ catalog, reloadCatalog, onClose, globalSettings, reloadGlo
                           <td>{b.pack_name}</td>
                           <td style={{ textAlign: 'center' }}>{b.backgrounds_qty > 0 ? b.backgrounds_qty : '–'}</td>
                           <td style={{ whiteSpace: 'nowrap' }}>
-                            {b.session_date ? new Date(b.session_date + 'T12:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' }) : '–'}
+                            <input 
+                              type="date" 
+                              className="form-input" 
+                              style={{ padding: '4px', fontSize: 12, border: 'none', background: 'transparent', outline: 'none' }} 
+                              value={b.session_date} 
+                              onChange={e => handleDateEdit(b.id!, e.target.value)} 
+                            />
                           </td>
                           <td style={{ fontWeight: 700 }}>{formatPrice(b.pack_price)}</td>
                           <td>
@@ -1082,6 +1131,7 @@ export default function App() {
   const [catalog, setCatalog] = useState<DbBackground[]>([]);
   const [packConfigs, setPackConfigs] = useState<PackConfig[]>([]);
   const [globalSettings, setGlobalSettings] = useState<GlobalSettings>({ id: 'default', cost_13x18: 0, cost_20x30: 0, cost_fotolibro: 0, cost_imanes: 0 });
+  const [availableDates, setAvailableDates] = useState<string[]>([]);
 
   const loadData = async () => {
     const { data: bgData } = await supabase.from('backgrounds').select('*').order('created_at', { ascending: true });
@@ -1092,6 +1142,9 @@ export default function App() {
     
     const { data: gData } = await supabase.from('global_settings').select('*').eq('id', 'default').maybeSingle();
     if (gData) setGlobalSettings(gData as GlobalSettings);
+
+    const { data: avData } = await supabase.from('available_dates').select('date');
+    if (avData) setAvailableDates(avData.map(d => d.date));
   };
 
   useEffect(() => { loadData(); }, []);
@@ -1229,7 +1282,7 @@ export default function App() {
     if (step === 0) return <StepCategory selected={category} onSelect={c => { setCategory(c); setPack(null); }}/>;
     if (step === 1) return <StepPack category={category!} selected={pack} onSelect={setPack} getPackPrice={getPackPrice} getPackInclusions={getPackInclusions}/>;
     if (isInfantil && step === 2) return <StepBackgrounds pack={pack!} value={backgrounds} onChange={setBackgrounds} selectedBackgrounds={selectedBackgrounds} onToggleBackground={toggleBackground} catalog={catalog}/>;
-    if (step === dateStep) return <StepCalendar category={category!} selected={date} time={time} onSelect={setDate} onSelectTime={setTime}/>;
+    if (step === dateStep) return <StepCalendar category={category!} selected={date} time={time} onSelect={setDate} onSelectTime={setTime} availableDates={availableDates}/>;
     if (step === formStep) return <StepForm data={form} onChange={d => setForm(f => ({ ...f, ...d }))}/>;
     if (step === confirmStep) return (
       <StepConfirm
@@ -1309,7 +1362,7 @@ export default function App() {
       </main>
 
       {/* Admin Panel */}
-      {showAdmin && <AdminPanel catalog={catalog} reloadCatalog={loadData} globalSettings={globalSettings} reloadGlobalSettings={loadData} onClose={() => setShowAdmin(false)}/>}
+      {showAdmin && <AdminPanel catalog={catalog} reloadCatalog={loadData} globalSettings={globalSettings} reloadGlobalSettings={loadData} availableDates={availableDates} reloadDates={loadData} onClose={() => setShowAdmin(false)}/>}
 
       {/* Toast */}
       {toast && <div className="toast">{toast}</div>}

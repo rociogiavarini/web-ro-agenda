@@ -113,3 +113,15 @@ COMMIT;
 
 -- Eliminar el constraint de estado para permitir los nuevos estados: reservado, pago_1, etc.
 ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_status_check;
+
+-- =========================================================
+-- Fechas Libres (Disponibilidad del Calendario)
+-- =========================================================
+CREATE TABLE IF NOT EXISTS available_dates (
+  date date PRIMARY KEY
+);
+
+ALTER TABLE available_dates ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "allow_all_available_dates" ON available_dates;
+CREATE POLICY "allow_all_available_dates" ON available_dates FOR ALL TO anon USING (true);

@@ -132,3 +132,7 @@ export type PackConfig = {
 };
 
 export const BACKGROUND_THEMES = ["personajes", "bosque", "tematicos", "clasicos", "globos", "otros"];
+
+export type AvailableDate = {
+  date: string;
+};
